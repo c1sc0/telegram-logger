@@ -7,7 +7,9 @@ services:
     volumes:
       - ./config.toml:/src/config.toml
       - db:/src/db
+      - media:/src/media
     restart: always
 
 volumes:
   db:
+  media:
