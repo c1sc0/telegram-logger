@@ -1,0 +1,13 @@
+version: "3.7"
+
+services:
+  telegram-logger:
+    image: scr.somogyi.xyz/telegram-logger:latest
+    container_name: telegram-logger
+    volumes:
+      - ./config.toml:/src/config.toml
+      - db:/src/db
+    restart: always
+
+volumes:
+  db:

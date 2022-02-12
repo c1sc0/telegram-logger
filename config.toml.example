@@ -1,6 +1,7 @@
 # API ID and hash to authenticate the application (not the user).
 api_id =
 api_hash = ""
+session = ""
 
 # Only enable in chats with the given IDs.
 #
