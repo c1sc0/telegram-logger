@@ -150,14 +150,16 @@ async def main():
             else:
                 print(out, flush=True)
 
+            fileId = None
+            if filename is not None:
+                fileId = msg.media.document.id
+                print(fileId)
             async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.cursor()
-
-                await cursor.execute("""
+                await db.execute("""
                     INSERT INTO event
-                        (type, date, chat_id, message_id, user_id, text, media_type, media_filename)
+                        (type, date, chat_id, message_id, user_id, text, media_type, media_filename, media_id)
                     VALUES
-                        ('new_message', :date, :chat_id, :message_id, :user_id, :text, :media_type, :media_filename)
+                        ('new_message', :date, :chat_id, :message_id, :user_id, :text, :media_type, :media_filename, :media_id)
                 """, {
                     'date': msg.date.timestamp(),
                     'chat_id': chat.id,
@@ -166,9 +168,18 @@ async def main():
                     'text': text,
                     'media_type': media_type,
                     'media_filename': filename,
+                    'media_id': fileId,
                 })
+                await db.commit()
 
             if msg.media and not isinstance(msg.media, MessageMediaWebPage) and save_media:
+                async with aiosqlite.connect(DB_PATH) as db:
+                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', { 'media_id': fileId })
+                    row = len(await cursor.fetchall())
+                    print(row)
+                    if row > 1:
+                        return
+
                 path = Path('media', str(chat.id), str(msg.id))
                 path.mkdir(parents=True, exist_ok=True)
                 await client.download_media(msg, path)
@@ -188,9 +199,7 @@ async def main():
             text = msg.message
 
             async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.cursor()
-
-                await cursor.execute("""
+                cursor = await db.execute("""
                 SELECT
                     text, media_type, media_filename
                 FROM
@@ -205,6 +214,7 @@ async def main():
                 """, {'chat_id': chat.id, 'message_id': msg.id})
 
                 innerRow = await cursor.fetchone()
+                await cursor.close()
 
             if innerRow:
                 old_text, old_media_type, old_filename = innerRow
@@ -277,14 +287,17 @@ async def main():
             else:
                 print(out)
 
-            async with aiosqlite.connect(DB_PATH) as db:
-                cursor = await db.cursor()
+            fileId = None
+            if filename is not None:
+                fileId = msg.media.document.id
+                print(fileId)
 
-                await cursor.execute("""
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute("""
                     INSERT INTO event
-                        (type, date, chat_id, message_id, user_id, text, media_type, media_filename)
+                        (type, date, chat_id, message_id, user_id, text, media_type, media_filename, media_id)
                     VALUES
-                        ('message_edited', :date, :chat_id, :message_id, :user_id, :text, :media_type, :media_filename)
+                        ('message_edited', :date, :chat_id, :message_id, :user_id, :text, :media_type, :media_filename, :media_id)
                 """, {
                     'date': msg.date.timestamp(),
                     'chat_id': chat.id,
@@ -293,9 +306,18 @@ async def main():
                     'text': text,
                     'media_type': media_type,
                     'media_filename': filename,
+                    'media_id' : fileId
                 })
+                await db.commit()
 
             if msg.media and not isinstance(msg.media, MessageMediaWebPage) and save_media:
+                async with aiosqlite.connect(DB_PATH) as db:
+                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', { 'media_id': fileId })
+                    row = len(await cursor.fetchall())
+                    print(row)
+                    if row > 1:
+                        return
+
                 path = Path('media', str(chat.id), str(msg.id))
                 path.mkdir(parents=True, exist_ok=True)
                 await client.download_media(msg, path)
@@ -320,9 +342,7 @@ async def main():
                 msg_display = f'({msg_id})'
 
                 async with aiosqlite.connect(DB_PATH) as db:
-                    cursor = await db.cursor()
-
-                    await cursor.execute("""
+                    cursor = await db.execute("""
                     SELECT
                         chat_id, user_id, text, media_type, media_filename
                     FROM
@@ -340,6 +360,7 @@ async def main():
                     })
 
                     innerRow = await cursor.fetchone()
+                    await cursor.close()
 
                 if innerRow:
                     chat_id, user_id, old_text, old_media_type, old_filename = innerRow
@@ -383,9 +404,7 @@ async def main():
                     print(out)
 
                 async with aiosqlite.connect(DB_PATH) as db:
-                    cursor = await db.cursor()
-
-                    await cursor.execute("""
+                    await db.execute("""
                         INSERT INTO event
                             (type, date, chat_id, message_id)
                         VALUES
@@ -395,6 +414,7 @@ async def main():
                         'chat_id': chat.id if chat else None,
                         'message_id': msg_id,
                     })
+                    await db.commit()
 
         await client.run_until_disconnected()
 
@@ -420,8 +440,9 @@ with sqlite3.connect(DB_PATH) as conn:
         c.execute('ALTER TABLE events RENAME TO event')
         c.execute('ALTER TABLE event ADD media_type TEXT')
         c.execute('ALTER TABLE event ADD media_filename TEXT')
+        c.execute('ALTER TABLE event ADD media_id TEXT')
         c.execute('PRAGMA user_version = 1')
-
+    conn.commit()
 
 if __name__ == '__main__':
     print('Listening for messages')
