@@ -1,4 +1,4 @@
-FROM python:3.9.10-slim-buster
+FROM docker.io/gelbpunkt/python:3.11
 
 WORKDIR /src
 
