@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, Union
 import asyncio
 import os
+from os import path
 import aiosqlite
 import toml
 from telethon import TelegramClient, events
@@ -15,8 +16,11 @@ from telethon.sessions import StringSession
 from telethon.tl.types import Channel, Chat, DocumentAttributeFilename, MessageMediaWebPage, User
 
 
-if not os.path.isdir('db'):
-   os.makedirs('db')
+if not path.exists('db'):
+    os.makedirs('db')
+
+if path.exists("data.sqlite3"):
+    os.rename("data.sqlite3", "./db/data.sqlite3")
 
 DB_PATH = './db/data.sqlite3'
 
@@ -150,10 +154,10 @@ async def main():
             else:
                 print(out, flush=True)
 
-            fileId = None
+            file_id = None
             if filename is not None:
-                fileId = msg.media.document.id
-                print(fileId)
+                file_id = msg.media.document.id
+
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("""
                     INSERT INTO event
@@ -168,15 +172,14 @@ async def main():
                     'text': text,
                     'media_type': media_type,
                     'media_filename': filename,
-                    'media_id': fileId,
+                    'media_id': file_id,
                 })
                 await db.commit()
 
             if msg.media and not isinstance(msg.media, MessageMediaWebPage) and save_media:
                 async with aiosqlite.connect(DB_PATH) as db:
-                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', { 'media_id': fileId })
+                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', {'media_id': file_id})
                     row = len(await cursor.fetchall())
-                    print(row)
                     if row > 1:
                         return
 
@@ -287,10 +290,9 @@ async def main():
             else:
                 print(out)
 
-            fileId = None
+            file_id = None
             if filename is not None:
-                fileId = msg.media.document.id
-                print(fileId)
+                file_id = msg.media.document.id
 
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("""
@@ -306,15 +308,14 @@ async def main():
                     'text': text,
                     'media_type': media_type,
                     'media_filename': filename,
-                    'media_id' : fileId
+                    'media_id': file_id
                 })
                 await db.commit()
 
             if msg.media and not isinstance(msg.media, MessageMediaWebPage) and save_media:
                 async with aiosqlite.connect(DB_PATH) as db:
-                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', { 'media_id': fileId })
+                    cursor = await db.execute('SELECT * FROM event WHERE media_id = :media_id', { 'media_id': file_id })
                     row = len(await cursor.fetchall())
-                    print(row)
                     if row > 1:
                         return
 
@@ -359,11 +360,11 @@ async def main():
                         'message_id': msg_id,
                     })
 
-                    innerRow = await cursor.fetchone()
+                    inner_row = await cursor.fetchone()
                     await cursor.close()
 
-                if innerRow:
-                    chat_id, user_id, old_text, old_media_type, old_filename = innerRow
+                if inner_row:
+                    chat_id, user_id, old_text, old_media_type, old_filename = inner_row
                 else:
                     chat_id, user_id, old_text, old_media_type, old_filename = None, None, None, None, None
 
@@ -440,8 +441,13 @@ with sqlite3.connect(DB_PATH) as conn:
         c.execute('ALTER TABLE events RENAME TO event')
         c.execute('ALTER TABLE event ADD media_type TEXT')
         c.execute('ALTER TABLE event ADD media_filename TEXT')
-        c.execute('ALTER TABLE event ADD media_id TEXT')
         c.execute('PRAGMA user_version = 1')
+
+    if schema_version < 2:
+        print('Performing db migration from version 1 to 2')
+        c.execute('ALTER TABLE event ADD media_id TEXT')
+        c.execute('PRAGMA user_version = 2')
+
     conn.commit()
 
 if __name__ == '__main__':

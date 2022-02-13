@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "telegram-logger"
+version = "0.1.2"
+description = "Telegram chat logger"
+authors = ["nyuszika7h <nyuszika7h@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+Telethon = "^1.24.0"
+toml = "^0.10.2"
+aiosqlite = "^0.17.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
